@@ -1,0 +1,16 @@
+[project]
+name = "nq-sweep-backtester"
+version = "0.0.1"
+description = "Session liquidity sweep backtester for NQ futures"
+requires-python = ">=3.11"
+dependencies = ["pandas", "numpy", "pyarrow"]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+include = ["strategy*", "backtest*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
