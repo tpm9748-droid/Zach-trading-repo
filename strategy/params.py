@@ -43,6 +43,22 @@ class StrategyParams:
     # CHoCH (1m bars; default 30 = ~30 min).
     max_entry_bars: int = 30
 
+    # Pressure / absorption (module 11) — OHLCV approximations.
+    # A "buying pressure" bar closes in its upper third, has a body that fills
+    # at least half its range, and is at least as large as the trailing body
+    # average. Mirror (lower third) for selling pressure.
+    pressure_close_upper_third: float = 0.67  # close-position threshold (buy)
+    pressure_close_lower_third: float = 0.33  # close-position threshold (sell)
+    pressure_min_body_fraction: float = 0.5
+    pressure_body_window: int = 20            # trailing SMA window for body size
+    pressure_body_vs_avg_mult: float = 1.0
+    # Absorption: high volume + unusually small range, sitting on a tested
+    # level. Volume threshold mirrors the sweep volume confirmation.
+    absorption_volume_window: int = 20
+    absorption_volume_mult: float = 1.5
+    absorption_range_window: int = 20
+    absorption_range_mult: float = 0.7        # range < mult * trailing avg range
+
     # Execution model (v1)
     slippage_ticks: int = 1
     commission_per_contract: float = 0.0  # in points; convert later

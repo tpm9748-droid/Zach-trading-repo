@@ -43,7 +43,7 @@ backtest/                 # Driver, loader, metrics.
   metrics.py              # Per-cohort trade stats + breakdowns.
   data_loader.py          # Databento OHLCV-1m CSV.zst -> list[Bar].
 
-tests/                    # 136 tests, all green.
+tests/                    # 151 tests, all green.
 scripts/                  # Runnable utilities.
   run_backtest.py         # Load real data, run backtest, print summary.
 data/                     # Databento data dumps (gitignored).
@@ -155,10 +155,10 @@ Returns `BacktestResult(trades, metrics, bar_count, sweep_events)`.
 ✅ VWAP
 ✅ HTF aggregation + trend
 ✅ Databento OHLCV loader
+✅ Buying pressure + absorption detectors (OHLCV approximations)
 
-**Pending (modules 11–12)**:
+**Pending (module 12)**:
 
-⏳ Buying pressure + absorption detectors (OHLCV approximations)
 ⏳ Continuation state machine (parallel setup using VWAP + HTF + FVG + pressure)
 
 **Known scope gap**:
@@ -167,7 +167,7 @@ Returns `BacktestResult(trades, metrics, bar_count, sweep_events)`.
 
 ## Test suite
 
-136 tests, all green:
+151 tests, all green:
 
 ```
 tests/test_bars.py                   foundation
@@ -183,6 +183,7 @@ tests/test_smoke.py                  end-to-end on synthetic bars
 tests/test_data_loader.py            Databento loader
 tests/test_vwap.py                   VWAP
 tests/test_htf.py                    HTF aggregation + trend
+tests/test_pressure.py               pressure + absorption (module 11)
 ```
 
 ## Data
