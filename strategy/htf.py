@@ -25,7 +25,7 @@ import pandas as pd
 
 from strategy.bars import Bar
 from strategy.sessions import ET, session_day_of
-from strategy.swings import SwingDetector, SwingKind
+from strategy.swings import SwingDetector, SwingKind, SwingPoint
 
 
 class TrendDirection(Enum):
@@ -158,6 +158,17 @@ class HTFTrend:
     def htf_bar_count(self) -> int:
         """Number of completed HTF bars seen so far."""
         return self._htf_bar_count
+
+    @property
+    def swing_highs(self) -> list[SwingPoint]:
+        """Confirmed HTF swing highs, chronological. Used by the continuation
+        setup to pick a target level in the trend direction."""
+        return self._swing_detector.highs
+
+    @property
+    def swing_lows(self) -> list[SwingPoint]:
+        """Confirmed HTF swing lows, chronological."""
+        return self._swing_detector.lows
 
     def current_trend(self) -> TrendDirection:
         """Bullish if last two confirmed swing highs AND lows are both rising;

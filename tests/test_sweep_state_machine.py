@@ -119,7 +119,9 @@ def test_idle_when_no_sweep_events():
 
 
 def test_sweep_with_no_paired_target_is_skipped():
-    """Sweep of a round number has no paired counterpart -> setup not started."""
+    """Sweep of a round number with no other level on the target side ->
+    nothing to aim at -> setup not started. (With other opposite-side levels
+    present, the expanded target rule would let it trade.)"""
     sm = SweepStateMachine(DEFAULT_PARAMS)
     swept = round_major(20000.0)
     ev = sweep_up_event(swept, penetration_bar_idx=0, wick_extreme=20000.75)

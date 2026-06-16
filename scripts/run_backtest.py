@@ -81,6 +81,14 @@ def main(path: str = DEFAULT_DATA) -> None:
               f"pnl={stats.total_pnl_points:+7.2f}")
 
     print()
+    print("=== BY SETUP KIND ===")
+    for kind, stats in sorted(m.by_setup_kind.items()):
+        print(f"  {kind:12s} "
+              f"n={stats.n_trades:>3d} "
+              f"wr={stats.win_rate:>5.1%} "
+              f"pnl={stats.total_pnl_points:+7.2f}")
+
+    print()
     print("=== BY DIRECTION ===")
     for direction, stats in sorted(m.by_direction.items()):
         print(f"  {direction:5s} "
@@ -104,9 +112,13 @@ def main(path: str = DEFAULT_DATA) -> None:
     print()
     print("=== FIRST 10 TRADES ===")
     for t in result.trades[:10]:
+        # Continuation trades carry no swept level; show setup kind instead.
+        if t.swept_level_kind is not None:
+            provenance = f"{t.swept_level_kind.value:18s} @{t.swept_level_price:>8.2f}"
+        else:
+            provenance = f"{t.setup_kind:18s} {'':>9s}"
         print(f"  {t.direction:5s} "
-              f"{t.swept_level_kind.value:18s} "
-              f"@{t.swept_level_price:>8.2f} -> "
+              f"{provenance} -> "
               f"entry {t.entry_price:>8.2f} "
               f"exit {t.exit_price:>8.2f} "
               f"({t.exit_reason:6s}) "

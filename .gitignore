@@ -6,6 +6,7 @@ __pycache__/
 data/raw/
 data/processed/
 *.parquet
+*.pkl
 *.egg-info/
 .ipynb_checkpoints/
 .env

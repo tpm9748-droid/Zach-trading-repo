@@ -59,6 +59,16 @@ class StrategyParams:
     absorption_range_window: int = 20
     absorption_range_mult: float = 0.7        # range < mult * trailing avg range
 
+    # Continuation setup (module 12). Trend-following: in an HTF uptrend,
+    # enter longs on a retest of session VWAP (the intraday "midpoint"),
+    # confirmed by buying pressure / absorption / an FVG sitting at VWAP.
+    # Mirror for shorts. Each confluence requirement is an independent gate
+    # so it can be relaxed against real-data evidence without code changes.
+    cont_htf_period: str = "4h"            # HTF trend filter timeframe
+    cont_require_pressure: bool = True     # buying/selling pressure on retest bar
+    cont_require_absorption: bool = True   # absorption at VWAP on retest bar
+    cont_require_fvg_at_vwap: bool = True  # an active FVG straddling VWAP
+
     # Execution model (v1)
     slippage_ticks: int = 1
     commission_per_contract: float = 0.0  # in points; convert later

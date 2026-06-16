@@ -61,12 +61,8 @@ from strategy.swings import (
 
 @dataclass(frozen=True)
 class Trade:
-    setup_kind: str          # "sweep" (continuation setups will use "continuation")
+    setup_kind: str          # "sweep" or "continuation"
     direction: str           # "long" or "short"
-    swept_level_kind: LevelKind
-    swept_level_price: float
-    sweep_bar_idx: int       # rejection bar of the sweep
-    choch_bar_idx: int
     entry_bar_idx: int
     entry_price: float
     stop_price: float
@@ -76,6 +72,13 @@ class Trade:
     exit_reason: str         # "stop", "target", "invalidated"
     pnl_points: float        # signed; +ve = winner
     rr_at_entry: float       # reward / risk computed at trade open
+    # Sweep-specific provenance. None for continuation trades, which have no
+    # swept level or CHoCH. Continuation provenance (the retest level) is left
+    # implicit in v1 — these stay None.
+    swept_level_kind: Optional[LevelKind] = None
+    swept_level_price: Optional[float] = None
+    sweep_bar_idx: Optional[int] = None  # rejection bar of the sweep
+    choch_bar_idx: Optional[int] = None
 
 
 # ---------------------------------------------------------------------------
@@ -95,8 +98,8 @@ PAIRED_OPPOSITES: dict[LevelKind, LevelKind] = {
 }
 
 
-def _find_target_price(swept_level: Level, active_levels: list[Level]) -> Optional[float]:
-    """Find the opposite-pair level (same source_day) to use as v1 target."""
+def _paired_target(swept_level: Level, active_levels: list[Level]) -> Optional[float]:
+    """The opposite-pair level (same source_day), if one is active."""
     pair_kind = PAIRED_OPPOSITES.get(swept_level.kind)
     if pair_kind is None:
         return None
@@ -104,6 +107,81 @@ def _find_target_price(swept_level: Level, active_levels: list[Level]) -> Option
         if lvl.kind == pair_kind and lvl.source_day == swept_level.source_day:
             return lvl.price
     return None
+
+
+def _has_opposite_side_level(
+    swept_level: Level, active_levels: list[Level], direction: str
+) -> bool:
+    """Idle-time check: is there ANY level on the target side to aim at?
+
+    Cheap gate so we don't start a reversal setup that can never find a target.
+    Target side is below for a short (sweep up), above for a long (sweep down).
+    The full R:R-filtered target is chosen later, at entry.
+    """
+    for lvl in active_levels:
+        if lvl is swept_level:
+            continue
+        if direction == "short" and lvl.price < swept_level.price:
+            return True
+        if direction == "long" and lvl.price > swept_level.price:
+            return True
+    return False
+
+
+def _find_target_price(
+    swept_level: Level,
+    active_levels: list[Level],
+    direction: str,
+    entry_price: float,
+    stop_price: float,
+    min_rr: float,
+) -> Optional[float]:
+    """Nearest opposite-direction level that clears the min-R:R filter.
+
+    Priority chain — first rule that yields a qualifying level wins:
+      1. paired session extreme (Asia<->Asia, London<->London, ...)
+      2. nearest EQH/EQL on the target side
+      3. nearest ROUND_MAJOR on the target side
+      4. nearest level of any kind on the target side
+
+    "Qualifying" means the level is far enough from entry that
+    reward/risk >= min_rr. Among qualifying levels we take the *nearest* to
+    entry — the most conservative target that still clears R:R. This is the
+    expansion that lets EQH/EQL/round-number sweeps (the bulk of real
+    signals) trade, instead of only paired session extremes.
+    """
+    risk = abs(entry_price - stop_price)
+    if risk <= 0:
+        return None
+    min_dist = min_rr * risk
+
+    def qualifies(price: float) -> bool:
+        if direction == "short":  # target below entry
+            return price <= entry_price - min_dist
+        return price >= entry_price + min_dist  # long: target above entry
+
+    def nearest(levels: list[Level]) -> Optional[float]:
+        prices = [l.price for l in levels if l is not swept_level and qualifies(l.price)]
+        if not prices:
+            return None
+        # Nearest to entry: highest qualifying price for a short (target is
+        # below, so highest = closest), lowest for a long.
+        return max(prices) if direction == "short" else min(prices)
+
+    # 1. paired session extreme
+    paired = _paired_target(swept_level, active_levels)
+    if paired is not None and qualifies(paired):
+        return paired
+    # 2. EQH / EQL
+    eq = nearest([l for l in active_levels if l.kind in (LevelKind.EQH, LevelKind.EQL)])
+    if eq is not None:
+        return eq
+    # 3. ROUND_MAJOR
+    rm = nearest([l for l in active_levels if l.kind == LevelKind.ROUND_MAJOR])
+    if rm is not None:
+        return rm
+    # 4. any kind
+    return nearest(active_levels)
 
 
 # ---------------------------------------------------------------------------
@@ -124,7 +202,9 @@ class SetupState(Enum):
 class _Setup:
     sweep: SweepEvent
     direction: str             # "short" (sweep up) or "long" (sweep down)
-    target_price: float
+    # Target is resolved at entry (needs entry+stop for the R:R filter), so it
+    # starts unset.
+    target_price: Optional[float] = None
     # After CHoCH:
     choch_bar_idx: Optional[int] = None
     ob: Optional[OrderBlock] = None
@@ -157,6 +237,9 @@ class SweepStateMachine:
         self._setup: Optional[_Setup] = None
         self._bar_count = 0
         self._bars: list[Bar] = []
+        # Most recent active-level snapshot — set each bar so the entry step
+        # (which only receives bar/bar_idx) can resolve a target.
+        self._active_levels: list[Level] = []
         # Sub-detectors maintained at LTF resolution.
         self._swing_detector = SwingDetector(n=params.ltf_swing_lookback)
         self._fvg_detector = FVGDetector()
@@ -181,6 +264,7 @@ class SweepStateMachine:
         bar_idx = self._bar_count
         self._bar_count += 1
         self._bars.append(bar)
+        self._active_levels = active_levels
         self._swing_detector.on_bar(bar)
         self._fvg_detector.on_bar(bar)
 
@@ -224,14 +308,14 @@ class SweepStateMachine:
 
     def _idle_step(self, bar, bar_idx, active_levels, sweep_events) -> None:
         # Multiple sweeps can fire on the same bar (e.g. ASIA_HIGH and a
-        # ROUND_MAJOR colocated at the same price). Take the first event whose
-        # swept level has a paired-counterpart target; the rest are dropped.
+        # ROUND_MAJOR colocated at the same price). Take the first event that
+        # has at least one level on its target side; the rest are dropped. The
+        # actual target (R:R-filtered) is resolved later, at entry.
         for ev in sweep_events:
             direction = "short" if ev.direction == SweepDirection.UP else "long"
-            target = _find_target_price(ev.level, active_levels)
-            if target is None:
+            if not _has_opposite_side_level(ev.level, active_levels, direction):
                 continue
-            self._setup = _Setup(sweep=ev, direction=direction, target_price=target)
+            self._setup = _Setup(sweep=ev, direction=direction)
             self._state = SetupState.WATCHING_FOR_CHOCH
             return
 
@@ -331,14 +415,23 @@ class SweepStateMachine:
         if entry_price is None:
             return
 
-        # Compute stop and R:R; reject if below threshold
+        # Compute stop, then resolve the target (R:R-filtered priority chain).
         stop_price = self._stop_price(setup, entry_price)
         risk = abs(entry_price - stop_price)
         if risk <= 0:
             self._reset()
             return
-        reward = abs(setup.target_price - entry_price)
-        rr = reward / risk
+        target = _find_target_price(
+            setup.sweep.level, self._active_levels, setup.direction,
+            entry_price, stop_price, self.params.min_rr_ratio,
+        )
+        if target is None:
+            # No level on the target side clears R:R — abandon the setup.
+            self._reset()
+            return
+        setup.target_price = target
+        reward = abs(target - entry_price)
+        rr = reward / risk  # >= min_rr by construction of _find_target_price
         if rr < self.params.min_rr_ratio:
             self._reset()
             return

@@ -40,6 +40,7 @@ class BacktestMetrics:
     by_level_kind: dict[LevelKind, TradeStats] = field(default_factory=dict)
     by_direction: dict[str, TradeStats] = field(default_factory=dict)
     by_exit_reason: dict[str, TradeStats] = field(default_factory=dict)
+    by_setup_kind: dict[str, TradeStats] = field(default_factory=dict)
     sharpe_per_trade: Optional[float] = None
 
 
@@ -95,17 +96,23 @@ def compute_metrics(trades: list[Trade]) -> BacktestMetrics:
     by_kind: dict[LevelKind, TradeStats] = {}
     by_dir: dict[str, TradeStats] = {}
     by_reason: dict[str, TradeStats] = {}
+    by_setup: dict[str, TradeStats] = {}
     if trades:
         kinds: dict[LevelKind, list[Trade]] = {}
         dirs: dict[str, list[Trade]] = {}
         reasons: dict[str, list[Trade]] = {}
+        setups: dict[str, list[Trade]] = {}
         for t in trades:
-            kinds.setdefault(t.swept_level_kind, []).append(t)
+            # by_level_kind is sweep-only; continuation trades carry no level.
+            if t.swept_level_kind is not None:
+                kinds.setdefault(t.swept_level_kind, []).append(t)
             dirs.setdefault(t.direction, []).append(t)
             reasons.setdefault(t.exit_reason, []).append(t)
+            setups.setdefault(t.setup_kind, []).append(t)
         by_kind = {k: _stats_for(v) for k, v in kinds.items()}
         by_dir = {k: _stats_for(v) for k, v in dirs.items()}
         by_reason = {k: _stats_for(v) for k, v in reasons.items()}
+        by_setup = {k: _stats_for(v) for k, v in setups.items()}
 
     sharpe: Optional[float] = None
     if len(trades) > 1:
@@ -119,5 +126,6 @@ def compute_metrics(trades: list[Trade]) -> BacktestMetrics:
         by_level_kind=by_kind,
         by_direction=by_dir,
         by_exit_reason=by_reason,
+        by_setup_kind=by_setup,
         sharpe_per_trade=sharpe,
     )

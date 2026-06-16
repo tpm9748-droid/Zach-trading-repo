@@ -22,6 +22,7 @@ from typing import Iterable
 from strategy.bars import Bar, BarSeries
 from strategy.levels import ReferenceLevels
 from strategy.params import StrategyParams
+from strategy.continuation_state_machine import ContinuationStateMachine
 from strategy.sweep import SweepDetector, SweepEvent
 from strategy.sweep_state_machine import SweepStateMachine, Trade
 
@@ -56,6 +57,8 @@ def run_backtest(
     levels = ReferenceLevels(params)
     sweep_detector = SweepDetector(params)
     state_machine = SweepStateMachine(params)
+    # Continuation runs in parallel — independent state, own sub-detectors.
+    continuation = ContinuationStateMachine(params)
 
     all_trades: list[Trade] = []
     all_sweeps: list[SweepEvent] = []
@@ -71,6 +74,9 @@ def run_backtest(
         new_trades = state_machine.on_bar(bar, active_levels, sweep_events)
         if new_trades:
             all_trades.extend(new_trades)
+        cont_trades = continuation.on_bar(bar)
+        if cont_trades:
+            all_trades.extend(cont_trades)
 
     return BacktestResult(
         trades=all_trades,
