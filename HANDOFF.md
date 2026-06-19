@@ -30,15 +30,22 @@ A bar-by-bar backtester for NASDAQ futures (NQ) implementing two ICT-style strat
 
 ## Research findings (validated via walk-forward; see memory `oos-validation-defaults-win`)
 
-The strategy was rigorously validated OOS across 3 contracts. Most levers **overfit** May and failed OOS (loosened thresholds, absorption continuation, exclude-all-Asia, OB-invalidation-off, continuation reclaim). Sweep win rate sits at ~24–25% = its 3:1 breakeven. **Two things validated:**
-1. `sweep_exclude_asia_shorts=True` (now default) — Asia shorts are the consistent loser; excluding them lifted clean-OOS +166→+202 and held the May holdout.
-2. `sweep_use_delta_confirmation=True` (opt-in, tick-data only) — true aggressor delta opposing the sweep lifts win rate to ~37% (combined OOS +35→+255; NQH6 28%→37.5%). The first lever to clear breakeven structurally. Caveat: ~halves trades; thin/mixed on small windows (May 0/7). Needs MORE tick data to confirm — the current archive is fully used.
+The strategy was rigorously validated OOS across 3 front-month contracts (NQZ5/NQH6/NQM6) with May held out. Baseline sweep win rate sits at ~24–25% = its 3:1 breakeven. **Most levers overfit May and failed OOS** (loosened thresholds, absorption continuation, exclude-all-Asia, OB-invalidation-off, continuation reclaim, HTF trend-alignment at both 4h and daily). **Three levers validated** (all OFF/opt-in except #1):
+
+1. `sweep_exclude_asia_shorts=True` (**default on**) — Asia shorts are the consistent loser; excluding them lifted clean-OOS +166→+202 and held the May holdout.
+2. `sweep_breakeven_at_r=1.0` (opt-in; **strongest**) — pull stop to entry after +1R. Combined OOS +35→**+143**, win 26%→36%, same trade count, and improves the May holdout (+75→+152). No tick data needed. Strongest candidate to promote to default (needs intrabar-fill care first — a wide bar hitting +R then returning can book a same-bar BE stop; would change the long happy-path target test).
+3. `sweep_use_delta_confirmation=True` (opt-in, **tick-data only**) — aggressor delta opposing the sweep lifts win rate to ~37% (OOS +35→+255). No-op on OHLCV (delta=0). Caveat: ~halves trades; thin May (n=7, 0 wins). Best stacked config: be_1r + delta = OOS +287 / 47.8% win (but thin May −23).
+
+**Directional edge is beta, not tradeable** (alpha-vs-beta check): profit skewed long only because the sample was net up-trending; no trend filter captured it OOS. The validated levers all move WIN RATE (direction-neutral), so they are not beta artifacts.
 
 **Continuation has no edge** in any tested variant and is shelved (inert by default: gates on ⇒ 0 trades).
 
+Validation harness: `scripts/walkforward.py` — add a config to its CONFIGS dict and it's tested across contracts. All experiment configs from this work are still in there.
+
 ## Best next steps
-- Acquire **more / newer tick data** to confirm the delta-confirmation edge (resolve the thin May/NQM6 windows) before trusting it live.
-- If pursuing delta further: it's parameter-free (sign only) by design — keep it that way to avoid overfitting; a magnitude threshold would be tuning on the same data.
+- **More / newer tick data** is the gating need — confirm the delta + be_1r+delta edges and resolve the thin May/NQM6 windows before trusting live. The Dec2025–May2026 archive is fully used.
+- **Promote `be_1r` to default** once intrabar-fill is modeled (it's the most robust win and needs no tick data).
+- Keep delta confirmation parameter-free (sign only) — a magnitude threshold would be tuning on the same data.
 
 ## Critical context the next session needs
 
