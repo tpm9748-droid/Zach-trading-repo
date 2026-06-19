@@ -98,6 +98,10 @@ class StrategyParams:
     cont_require_absorption: bool = True   # absorption at VWAP on retest bar
     cont_require_fvg_at_vwap: bool = True  # an active FVG straddling VWAP
 
+    # Exit management: once price moves this many R in favor, move the stop to
+    # breakeven (entry). 0.0 = off. Caps "went +R then reversed" losers.
+    sweep_breakeven_at_r: float = 0.0
+
     # Execution model (v1)
     slippage_ticks: int = 1
     commission_per_contract: float = 0.0  # in points; convert later

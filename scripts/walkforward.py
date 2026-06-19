@@ -75,6 +75,11 @@ CONFIGS = {
     "trend_align": dict(sweep_require_htf_alignment=True),
     # Trend alignment + delta confirmation stacked.
     "trend_delta": dict(sweep_require_htf_alignment=True, sweep_use_delta_confirmation=True),
+    # Exit management: breakeven stop after +1R / +1.5R.
+    "be_1r": dict(sweep_breakeven_at_r=1.0),
+    "be_1_5r": dict(sweep_breakeven_at_r=1.5),
+    # Breakeven stacked with the validated delta confirmation.
+    "be_1r_delta": dict(sweep_breakeven_at_r=1.0, sweep_use_delta_confirmation=True),
 }
 
 

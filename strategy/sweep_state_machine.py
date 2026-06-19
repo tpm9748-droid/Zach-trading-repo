@@ -223,6 +223,8 @@ class _Setup:
     entry_price: Optional[float] = None
     stop_price: Optional[float] = None
     rr_at_entry: Optional[float] = None
+    initial_risk: Optional[float] = None   # |entry - initial stop|, for R math
+    be_moved: bool = False                  # stop already pulled to breakeven
     # Pending exit:
     pending_exit_reason: Optional[str] = None
 
@@ -472,11 +474,25 @@ class SweepStateMachine:
             self._reset()
             return
         setup.rr_at_entry = reward / risk
+        setup.initial_risk = risk
         self._state = SetupState.IN_TRADE
 
     def _in_trade_step(self, bar, bar_idx) -> None:
         setup = self._setup
         reason: Optional[str] = None
+
+        # Breakeven stop: once price runs +R in favor, pull the stop to entry.
+        be_r = self.params.sweep_breakeven_at_r
+        if be_r > 0 and not setup.be_moved and setup.initial_risk:
+            move = setup.initial_risk * be_r
+            if setup.direction == "short":
+                reached = bar.low <= setup.entry_price - move
+            else:
+                reached = bar.high >= setup.entry_price + move
+            if reached:
+                setup.stop_price = setup.entry_price
+                setup.be_moved = True
+
         use_invalid = self.params.sweep_use_ob_invalidation
         if setup.direction == "short":
             # Stop above, target below

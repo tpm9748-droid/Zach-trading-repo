@@ -369,6 +369,38 @@ def test_htf_alignment_skips_counter_trend_and_allows_with_trend():
     assert sm2.state == SetupState.WATCHING_FOR_CHOCH
 
 
+def _be_long_bars() -> list[Bar]:
+    """Long happy setup, but post-entry: reach +1R, then dip back to entry."""
+    bars = _build_long_happy_bars()
+    bars[13] = bar(13, 103, 106, 102.5, 105)    # high 106 >= +1R (105.25); no target/stop
+    bars[14] = bar(14, 104, 104, 101, 101.5)    # low 101 dips below entry (102)
+    bars.append(bar(15, 101.5, 102, 101, 101.5))  # exit fill
+    return bars
+
+
+def test_breakeven_stop_exits_at_entry_when_enabled():
+    params = replace(DEFAULT_PARAMS, sweep_breakeven_at_r=1.0)
+    sm = SweepStateMachine(params)
+    swept, pair = asia_low(100.0), asia_high(120.0)
+    bars_seq = _be_long_bars()
+    ev = sweep_down_event(swept, penetration_bar_idx=7, wick_extreme=99.25, bars=bars_seq)
+    closed = feed(sm, bars_seq, {7: ev}, default_levels=[swept, pair])
+    assert len(closed) == 1
+    assert closed[0].exit_reason == "stop"
+    assert closed[0].stop_price == 102.0  # pulled to entry
+
+
+def test_breakeven_off_lets_trade_run():
+    sm = SweepStateMachine(DEFAULT_PARAMS)  # breakeven off
+    swept, pair = asia_low(100.0), asia_high(120.0)
+    bars_seq = _be_long_bars()
+    ev = sweep_down_event(swept, penetration_bar_idx=7, wick_extreme=99.25, bars=bars_seq)
+    closed = feed(sm, bars_seq, {7: ev}, default_levels=[swept, pair])
+    # Original stop 98.75 is never hit -> trade still open, no early exit.
+    assert closed == []
+    assert sm.state == SetupState.IN_TRADE
+
+
 def test_low_rr_rejects_trade():
     """Same setup but target too close -> R:R below min_rr_ratio -> skipped."""
     sm = SweepStateMachine(DEFAULT_PARAMS)
