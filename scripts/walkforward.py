@@ -61,6 +61,13 @@ CONFIGS = {
     # Continuation redesign: VWAP touch vs reclaim (gates off to isolate the trigger).
     "cont_touch_nogate": {**_CONT_NOGATE, "cont_entry_mode": "touch"},
     "cont_reclaim_nogate": {**_CONT_NOGATE, "cont_entry_mode": "reclaim"},
+    # Session filter (exclude Asia) + volume sensitivity for the reversals.
+    "no_asia": dict(sweep_exclude_asia=True),
+    "no_asia_v12": dict(sweep_exclude_asia=True, volume_mult=1.2),
+    "no_asia_v18": dict(sweep_exclude_asia=True, volume_mult=1.8),
+    "no_asia_v20": dict(sweep_exclude_asia=True, volume_mult=2.0),
+    # Narrower: exclude only Asia shorts (the consistent loser cohort).
+    "no_asia_shorts": dict(sweep_exclude_asia_shorts=True),
 }
 
 

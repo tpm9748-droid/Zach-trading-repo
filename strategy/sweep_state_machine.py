@@ -44,6 +44,7 @@ from strategy.bars import Bar
 from strategy.fvg import FVG, FVGDetector, FVGKind, FVGState, OrderBlock, find_order_block
 from strategy.levels import Level, LevelKind
 from strategy.params import NQ_TICK_SIZE, StrategyParams
+from strategy.sessions import Session, classify
 from strategy.sweep import SweepDirection, SweepEvent
 from strategy.swings import (
     BreakMode,
@@ -311,8 +312,15 @@ class SweepStateMachine:
         # ROUND_MAJOR colocated at the same price). Take the first event that
         # has at least one level on its target side; the rest are dropped. The
         # actual target (R:R-filtered) is resolved later, at entry.
+        # Optionally skip sweeps during the Asia session (low-liquidity noise).
+        in_asia = classify(bar.ts) == Session.ASIA
+        if in_asia and self.params.sweep_exclude_asia:
+            return
         for ev in sweep_events:
             direction = "short" if ev.direction == SweepDirection.UP else "long"
+            # Narrower filter: skip only Asia-session shorts.
+            if in_asia and self.params.sweep_exclude_asia_shorts and direction == "short":
+                continue
             if not _has_opposite_side_level(ev.level, active_levels, direction):
                 continue
             self._setup = _Setup(sweep=ev, direction=direction)

@@ -43,7 +43,7 @@ backtest/                 # Driver, loader, metrics.
   metrics.py              # Per-cohort trade stats + breakdowns.
   data_loader.py          # Databento OHLCV-1m CSV.zst -> list[Bar].
 
-tests/                    # 162 tests, all green.
+tests/                    # 174 tests, all green.
 scripts/                  # Runnable utilities.
   run_backtest.py         # Load real data, run backtest, print summary.
 data/                     # Databento data dumps (gitignored).
@@ -135,6 +135,7 @@ Returns `BacktestResult(trades, metrics, bar_count, sweep_events)`.
 | Position size | 1 contract, no pyramiding | |
 | Execution | next-bar-open fill | "strict no-lookahead" |
 | HTF trend filter | log only, don't reject | per user choice |
+| Exclude Asia shorts | on (`sweep_exclude_asia_shorts`) | only validated edge: Asia shorts win ~14% |
 | News filter | not yet implemented | |
 | VWAP anchor | 18:00 ET session open | |
 | Daily bias | HH/HL on daily | |
@@ -164,7 +165,7 @@ Returns `BacktestResult(trades, metrics, bar_count, sweep_events)`.
 
 ## Test suite
 
-162 tests, all green:
+174 tests, all green:
 
 ```
 tests/test_bars.py                   foundation

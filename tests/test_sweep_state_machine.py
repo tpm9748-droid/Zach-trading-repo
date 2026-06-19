@@ -283,6 +283,62 @@ def test_ob_invalidation_skipped_when_disabled():
     assert sm.state == SetupState.IN_TRADE
 
 
+def _bar_at(et_time: str, o, h, l, c, v=100.0) -> Bar:
+    ts = pd.Timestamp(f"2026-06-01 {et_time}").tz_localize("US/Eastern").tz_convert("UTC")
+    return Bar(ts=ts, open=o, high=h, low=l, close=c, volume=v)
+
+
+def test_exclude_asia_skips_asia_session_sweep():
+    params = replace(DEFAULT_PARAMS, sweep_exclude_asia=True)
+    sm = SweepStateMachine(params)
+    swept, pair = asia_high(100.0), asia_low(80.0)
+    ev = sweep_up_event(swept, penetration_bar_idx=0, wick_extreme=100.75)
+    sm.on_bar(_bar_at("20:00", 99, 100.75, 98.5, 99.5), [swept, pair], [ev])  # Asia
+    assert sm.state == SetupState.IDLE
+
+
+def test_exclude_asia_allows_london_session_sweep():
+    params = replace(DEFAULT_PARAMS, sweep_exclude_asia=True)
+    sm = SweepStateMachine(params)
+    swept, pair = asia_high(100.0), asia_low(80.0)
+    ev = sweep_up_event(swept, penetration_bar_idx=0, wick_extreme=100.75)
+    sm.on_bar(_bar_at("05:00", 99, 100.75, 98.5, 99.5), [swept, pair], [ev])  # London
+    assert sm.state == SetupState.WATCHING_FOR_CHOCH
+
+
+def test_asia_long_armed_under_defaults():
+    """Defaults block only Asia SHORTS (sweep_exclude_asia_shorts=True); an
+    Asia long still arms, and a non-Asia short still arms."""
+    # Asia long -> armed.
+    sm = SweepStateMachine(DEFAULT_PARAMS)
+    swept_l, pair_l = asia_low(100.0), asia_high(120.0)
+    long_ev = sweep_down_event(swept_l, penetration_bar_idx=0, wick_extreme=99.25)
+    sm.on_bar(_bar_at("20:00", 101, 101.5, 99.25, 100.5), [swept_l, pair_l], [long_ev])
+    assert sm.state == SetupState.WATCHING_FOR_CHOCH
+    # Asia short -> skipped under defaults.
+    sm2 = SweepStateMachine(DEFAULT_PARAMS)
+    swept_s, pair_s = asia_high(100.0), asia_low(80.0)
+    short_ev = sweep_up_event(swept_s, penetration_bar_idx=0, wick_extreme=100.75)
+    sm2.on_bar(_bar_at("20:00", 99, 100.75, 98.5, 99.5), [swept_s, pair_s], [short_ev])
+    assert sm2.state == SetupState.IDLE
+
+
+def test_exclude_asia_shorts_skips_asia_short_keeps_asia_long():
+    params = replace(DEFAULT_PARAMS, sweep_exclude_asia_shorts=True)
+    # Asia-session SHORT (sweep up) -> skipped.
+    sm = SweepStateMachine(params)
+    swept, pair = asia_high(100.0), asia_low(80.0)
+    short_ev = sweep_up_event(swept, penetration_bar_idx=0, wick_extreme=100.75)
+    sm.on_bar(_bar_at("20:00", 99, 100.75, 98.5, 99.5), [swept, pair], [short_ev])
+    assert sm.state == SetupState.IDLE
+    # Asia-session LONG (sweep down) -> still armed.
+    sm2 = SweepStateMachine(params)
+    swept_l, pair_l = asia_low(100.0), asia_high(120.0)
+    long_ev = sweep_down_event(swept_l, penetration_bar_idx=0, wick_extreme=99.25)
+    sm2.on_bar(_bar_at("20:00", 101, 101.5, 99.25, 100.5), [swept_l, pair_l], [long_ev])
+    assert sm2.state == SetupState.WATCHING_FOR_CHOCH
+
+
 def test_low_rr_rejects_trade():
     """Same setup but target too close -> R:R below min_rr_ratio -> skipped."""
     sm = SweepStateMachine(DEFAULT_PARAMS)

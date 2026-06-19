@@ -46,6 +46,17 @@ class StrategyParams:
     # block (the OB-invalidation rule). Toggleable so we can measure whether
     # cutting trades early helps or hurts the R-multiple distribution.
     sweep_use_ob_invalidation: bool = True
+    # Don't arm a sweep setup during the Asia session. Cohort analysis showed
+    # Asia-session sweeps win ~17% (below the 3:1 breakeven) and lose money,
+    # while London/NY sweeps win ~30%. Off by default — excluding ALL of Asia
+    # failed to validate (it also removed profitable Asia longs).
+    sweep_exclude_asia: bool = False
+    # Narrower, direction-aware variant: skip only Asia-session SHORTS (the
+    # consistent loser cohort: ~14% win, -121 pts), keeping Asia longs.
+    # Adopted as default ON: the only refinement to validate out-of-sample —
+    # lifts clean-OOS PnL (+166->+202) and win rate in every window incl. the
+    # May holdout. Modest edge on one regime; revisit with more data.
+    sweep_exclude_asia_shorts: bool = True
 
     # Pressure / absorption (module 11) — OHLCV approximations.
     # A "buying pressure" bar closes in its upper third, has a body that fills
