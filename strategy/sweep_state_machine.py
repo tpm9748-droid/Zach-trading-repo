@@ -42,6 +42,7 @@ import pandas as pd
 
 from strategy.bars import Bar
 from strategy.fvg import FVG, FVGDetector, FVGKind, FVGState, OrderBlock, find_order_block
+from strategy.htf import HTFTrend, TrendDirection
 from strategy.levels import Level, LevelKind
 from strategy.params import NQ_TICK_SIZE, StrategyParams
 from strategy.sessions import Session, classify
@@ -244,6 +245,8 @@ class SweepStateMachine:
         # Sub-detectors maintained at LTF resolution.
         self._swing_detector = SwingDetector(n=params.ltf_swing_lookback)
         self._fvg_detector = FVGDetector()
+        # HTF trend for the optional with-trend alignment filter.
+        self._htf = HTFTrend(period=params.cont_htf_period)
         # Completed trades (caller can read or via return value).
         self._closed_trades: list[Trade] = []
 
@@ -268,6 +271,7 @@ class SweepStateMachine:
         self._active_levels = active_levels
         self._swing_detector.on_bar(bar)
         self._fvg_detector.on_bar(bar)
+        self._htf.on_bar(bar)
 
         newly_closed: list[Trade] = []
 
@@ -316,8 +320,15 @@ class SweepStateMachine:
         in_asia = classify(bar.ts) == Session.ASIA
         if in_asia and self.params.sweep_exclude_asia:
             return
+        trend = self._htf.current_trend()
         for ev in sweep_events:
             direction = "short" if ev.direction == SweepDirection.UP else "long"
+            # With-trend filter: skip sweeps that fight a defined HTF trend.
+            if self.params.sweep_require_htf_alignment:
+                if direction == "long" and trend == TrendDirection.BEARISH:
+                    continue
+                if direction == "short" and trend == TrendDirection.BULLISH:
+                    continue
             # Narrower filter: skip only Asia-session shorts.
             if in_asia and self.params.sweep_exclude_asia_shorts and direction == "short":
                 continue

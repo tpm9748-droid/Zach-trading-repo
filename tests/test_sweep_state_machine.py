@@ -339,6 +339,36 @@ def test_exclude_asia_shorts_skips_asia_short_keeps_asia_long():
     assert sm2.state == SetupState.WATCHING_FOR_CHOCH
 
 
+class _FakeHTF:
+    def __init__(self, trend):
+        self._t = trend
+
+    def on_bar(self, bar):
+        pass
+
+    def current_trend(self):
+        return self._t
+
+
+def test_htf_alignment_skips_counter_trend_and_allows_with_trend():
+    from strategy.htf import TrendDirection
+    params = replace(DEFAULT_PARAMS, sweep_require_htf_alignment=True)
+    # Counter-trend short (sweep up) in a BULLISH trend -> skipped.
+    sm = SweepStateMachine(params)
+    sm._htf = _FakeHTF(TrendDirection.BULLISH)
+    swept, pair = asia_high(100.0), asia_low(80.0)
+    ev = sweep_up_event(swept, penetration_bar_idx=0, wick_extreme=100.75)
+    sm.on_bar(_bar_at("10:00", 99, 100.75, 98.5, 99.5), [swept, pair], [ev])
+    assert sm.state == SetupState.IDLE
+    # With-trend long (sweep down) in a BULLISH trend -> armed.
+    sm2 = SweepStateMachine(params)
+    sm2._htf = _FakeHTF(TrendDirection.BULLISH)
+    swept_l, pair_l = asia_low(100.0), asia_high(120.0)
+    ev_l = sweep_down_event(swept_l, penetration_bar_idx=0, wick_extreme=99.25)
+    sm2.on_bar(_bar_at("10:00", 101, 101.5, 99.25, 100.5), [swept_l, pair_l], [ev_l])
+    assert sm2.state == SetupState.WATCHING_FOR_CHOCH
+
+
 def test_low_rr_rejects_trade():
     """Same setup but target too close -> R:R below min_rr_ratio -> skipped."""
     sm = SweepStateMachine(DEFAULT_PARAMS)

@@ -55,6 +55,11 @@ class StrategyParams:
     # while London/NY sweeps win ~30%. Off by default — excluding ALL of Asia
     # failed to validate (it also removed profitable Asia longs).
     sweep_exclude_asia: bool = False
+    # Only take sweeps aligned with the 4h HTF trend (skip counter-trend
+    # sweeps). Alpha-vs-beta analysis showed the with-trend direction wins in
+    # both up and down regimes while the counter-trend side loses. Undefined
+    # trend is allowed through. Off by default until validated.
+    sweep_require_htf_alignment: bool = False
     # Narrower, direction-aware variant: skip only Asia-session SHORTS (the
     # consistent loser cohort: ~14% win, -121 pts), keeping Asia longs.
     # Adopted as default ON: the only refinement to validate out-of-sample —

@@ -71,6 +71,10 @@ CONFIGS = {
     # True order-flow: require aggressor delta to oppose the sweep (on top of
     # current defaults, which already exclude Asia shorts).
     "delta_confirm": dict(sweep_use_delta_confirmation=True),
+    # Trade with the 4h trend only (skip counter-trend sweeps).
+    "trend_align": dict(sweep_require_htf_alignment=True),
+    # Trend alignment + delta confirmation stacked.
+    "trend_delta": dict(sweep_require_htf_alignment=True, sweep_use_delta_confirmation=True),
 }
 
 
