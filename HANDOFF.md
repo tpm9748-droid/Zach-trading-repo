@@ -18,15 +18,27 @@ A bar-by-bar backtester for NASDAQ futures (NQ) implementing two ICT-style strat
 
 ## What's complete vs. what's left
 
-**Done** — modules 1–10 + 13:
-- Foundation, sessions, params, reference levels, swings/CHoCH, FVG/OB, sweep detector, sweep state machine, engine, metrics, smoke test, VWAP, HTF (daily + 4h), Databento loader
+**Done** — modules 1–13 (all built):
+- Foundation, sessions, params, reference levels, swings/CHoCH, FVG/OB, sweep detector, sweep state machine, engine, metrics, smoke test, VWAP, HTF (daily + 4h), Databento loader.
+- **Module 11** (pressure + absorption, OHLCV proxies) — `strategy/pressure.py`.
+- **Module 12** (continuation state machine, parallel to sweep) — `strategy/continuation_state_machine.py`.
+- **Target-rule expansion** — `_find_target_price` now falls back paired → EQH/EQL → ROUND_MAJOR → any opposite-side level, R:R-filtered, resolved at entry. Closed the ~85% sweep-skip gap.
+- **Walk-forward harness** — `backtest/trades_loader.py` (tick trades → 1m bars, with aggressor delta) + `scripts/walkforward.py` (per-front-month-contract validation; add a config to its CONFIGS dict and it's tested across NQZ5/NQH6/NQM6 with May held out).
+- **Order-flow delta** — `Bar.delta` + `sweep_use_delta_confirmation` (opt-in).
 
-**Pending** — modules 11 + 12:
-- **Module 11**: Buying pressure + absorption detectors (OHLCV approximations). See user-decided params below.
-- **Module 12**: Continuation state machine — parallel to the sweep state machine. Uses HTF trend (bullish for longs), pullback to session VWAP, FVG confluence at VWAP, buying pressure on the retest bar, absorption confirming the level holds.
+177 tests green. Six contracts of tick data live under `data/GLBX-20260601-LTGN97VDN8/` (Dec2025–May2026); the May OHLCV-1m file is `data/GLBX-20260601-J9M5CGTAY5/`.
 
-**Known scope gap to address after 12**:
-- The v1 sweep target rule only handles paired session extremes (Asia↔Asia etc.). On real NQ data this skips ~85% of detected sweeps because they're at EQH/EQL/round levels with no paired counterpart. Need to extend `_find_target_price` in `strategy/sweep_state_machine.py` to also use: nearest EQH/EQL in trade direction, nearest ROUND_MAJOR in trade direction, falling back to the paired session extreme. Each candidate must clear the min-R:R filter; pick the closest that does.
+## Research findings (validated via walk-forward; see memory `oos-validation-defaults-win`)
+
+The strategy was rigorously validated OOS across 3 contracts. Most levers **overfit** May and failed OOS (loosened thresholds, absorption continuation, exclude-all-Asia, OB-invalidation-off, continuation reclaim). Sweep win rate sits at ~24–25% = its 3:1 breakeven. **Two things validated:**
+1. `sweep_exclude_asia_shorts=True` (now default) — Asia shorts are the consistent loser; excluding them lifted clean-OOS +166→+202 and held the May holdout.
+2. `sweep_use_delta_confirmation=True` (opt-in, tick-data only) — true aggressor delta opposing the sweep lifts win rate to ~37% (combined OOS +35→+255; NQH6 28%→37.5%). The first lever to clear breakeven structurally. Caveat: ~halves trades; thin/mixed on small windows (May 0/7). Needs MORE tick data to confirm — the current archive is fully used.
+
+**Continuation has no edge** in any tested variant and is shelved (inert by default: gates on ⇒ 0 trades).
+
+## Best next steps
+- Acquire **more / newer tick data** to confirm the delta-confirmation edge (resolve the thin May/NQM6 windows) before trusting it live.
+- If pursuing delta further: it's parameter-free (sign only) by design — keep it that way to avoid overfitting; a magnitude threshold would be tuning on the same data.
 
 ## Critical context the next session needs
 
@@ -157,7 +169,7 @@ Pick the first that clears R:R. Then run the backtest again — expect many more
 ## Test status at handoff
 
 ```
-136 passed in 0.14s
+177 passed
 ```
 
 Last commit before handoff (push after writing this file):
