@@ -28,6 +28,34 @@ def warmup(det: SweepDetector, n: int, base_price: float = 100.0, vol: float = 1
         det.on_bar(bar(i, base_price, base_price + 0.5, base_price - 0.5, base_price, vol), [])
 
 
+def _bar_d(minute, o, h, l, c, v, d) -> Bar:
+    base = pd.Timestamp("2026-06-01 09:30").tz_localize("US/Eastern").tz_convert("UTC")
+    return Bar(ts=base + pd.Timedelta(minutes=minute), open=o, high=h, low=l, close=c, volume=v, delta=d)
+
+
+def test_delta_confirmation_requires_opposing_flow():
+    p = replace(DEFAULT_PARAMS, sweep_use_delta_confirmation=True)
+    # Up-sweep rejection with net SELLING (delta < 0) -> confirmed.
+    d1 = SweepDetector(p)
+    warmup(d1, p.volume_window, 99, 100)
+    ev = d1.on_bar(_bar_d(50, 99, 100.75, 98, 99.5, 200, -50), [asia_high_level(100.0)])
+    assert len(ev) == 1
+    # Same geometry but net BUYING (delta > 0) -> rejected by the delta filter.
+    d2 = SweepDetector(p)
+    warmup(d2, p.volume_window, 99, 100)
+    ev2 = d2.on_bar(_bar_d(50, 99, 100.75, 98, 99.5, 200, +50), [asia_high_level(100.0)])
+    assert ev2 == []
+
+
+def test_delta_confirmation_off_ignores_delta():
+    p = DEFAULT_PARAMS  # filter off by default
+    d = SweepDetector(p)
+    warmup(d, p.volume_window, 99, 100)
+    # Net buying on an up-sweep, but filter off -> still fires on volume alone.
+    ev = d.on_bar(_bar_d(50, 99, 100.75, 98, 99.5, 200, +50), [asia_high_level(100.0)])
+    assert len(ev) == 1
+
+
 # ---------------------------------------------------------------------------
 # Volume bootstrap
 # ---------------------------------------------------------------------------

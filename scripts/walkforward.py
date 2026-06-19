@@ -68,6 +68,9 @@ CONFIGS = {
     "no_asia_v20": dict(sweep_exclude_asia=True, volume_mult=2.0),
     # Narrower: exclude only Asia shorts (the consistent loser cohort).
     "no_asia_shorts": dict(sweep_exclude_asia_shorts=True),
+    # True order-flow: require aggressor delta to oppose the sweep (on top of
+    # current defaults, which already exclude Asia shorts).
+    "delta_confirm": dict(sweep_use_delta_confirmation=True),
 }
 
 

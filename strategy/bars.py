@@ -21,6 +21,9 @@ class Bar:
     low: float
     close: float
     volume: float
+    # Signed aggressor delta (buy size - sell size) when built from tick
+    # trades; 0.0 for pre-aggregated OHLCV bars that lack order-flow data.
+    delta: float = 0.0
 
     def __post_init__(self) -> None:
         if self.ts.tzinfo is None:

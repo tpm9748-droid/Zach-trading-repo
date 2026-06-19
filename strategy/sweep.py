@@ -189,14 +189,15 @@ class SweepDetector:
         )
         if closed_inside:
             ratio = self._volume_ratio(bar)
-            if ratio is not None and ratio >= self.params.volume_mult:
+            if (ratio is not None and ratio >= self.params.volume_mult
+                    and self._delta_confirms(bar, direction)):
                 return SweepEvent(
                     level=level, direction=direction,
                     penetration_bar_idx=bar_idx, rejection_bar_idx=bar_idx,
                     wick_extreme=wick_extreme, penetration_ticks=depth,
                     volume_ratio=ratio, ts=bar.ts,
                 )
-            # Closed inside but volume insufficient — candidate is finished
+            # Closed inside but volume/delta insufficient — candidate is finished
             # (no further bars can confirm a same-bar sweep). Discard silently.
             return None
 
@@ -232,7 +233,8 @@ class SweepDetector:
         )
         if closed_inside:
             ratio = self._volume_ratio(bar)
-            if ratio is not None and ratio >= self.params.volume_mult:
+            if (ratio is not None and ratio >= self.params.volume_mult
+                    and self._delta_confirms(bar, p.direction)):
                 return SweepEvent(
                     level=p.level, direction=p.direction,
                     penetration_bar_idx=p.penetration_bar_idx,
@@ -241,7 +243,7 @@ class SweepDetector:
                     penetration_ticks=depth,
                     volume_ratio=ratio, ts=bar.ts,
                 )
-            # Insufficient volume; treat as expired (no valid sweep)
+            # Insufficient volume/delta; treat as expired (no valid sweep)
             return "expired"
 
         # Still penetrating. Has the window elapsed?
@@ -254,3 +256,13 @@ class SweepDetector:
         if sma is None or sma == 0:
             return None
         return bar.volume / sma
+
+    def _delta_confirms(self, bar: Bar, direction: SweepDirection) -> bool:
+        """True if aggressor delta opposes the sweep (confirming the rejection).
+        No-op when the filter is off. Up-sweeps want net selling (delta < 0);
+        down-sweeps want net buying (delta > 0)."""
+        if not self.params.sweep_use_delta_confirmation:
+            return True
+        if direction == SweepDirection.UP:
+            return bar.delta < 0
+        return bar.delta > 0

@@ -29,6 +29,10 @@ class StrategyParams:
     max_rejection_bars: int = 3
     volume_window: int = 20
     volume_mult: float = 1.5
+    # Require true aggressor delta to oppose the sweep on the rejection bar
+    # (net selling rejects an up-sweep; net buying rejects a down-sweep).
+    # Needs tick-derived bars (Bar.delta); a no-op on OHLCV bars (delta=0).
+    sweep_use_delta_confirmation: bool = False
 
     # LTF structure
     ltf_swing_lookback: int = 3
