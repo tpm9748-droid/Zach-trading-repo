@@ -458,20 +458,21 @@ class SweepStateMachine:
     def _in_trade_step(self, bar, bar_idx) -> None:
         setup = self._setup
         reason: Optional[str] = None
+        use_invalid = self.params.sweep_use_ob_invalidation
         if setup.direction == "short":
             # Stop above, target below
             if bar.high >= setup.stop_price:
                 reason = "stop"
             elif bar.low <= setup.target_price:
                 reason = "target"
-            elif setup.ob is not None and bar.close > setup.ob.upper:
+            elif use_invalid and setup.ob is not None and bar.close > setup.ob.upper:
                 reason = "invalidated"
         else:
             if bar.low <= setup.stop_price:
                 reason = "stop"
             elif bar.high >= setup.target_price:
                 reason = "target"
-            elif setup.ob is not None and bar.close < setup.ob.lower:
+            elif use_invalid and setup.ob is not None and bar.close < setup.ob.lower:
                 reason = "invalidated"
         if reason is not None:
             setup.pending_exit_reason = reason

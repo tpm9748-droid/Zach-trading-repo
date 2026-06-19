@@ -50,9 +50,17 @@ def _slice(bars, start, end):
 
 # Named configs to validate. Add new candidate changes here — they get tested
 # across every contract automatically.
+_CONT_NOGATE = dict(
+    cont_require_pressure=False, cont_require_absorption=False, cont_require_fvg_at_vwap=False,
+)
 CONFIGS = {
     "DEFAULTS": dict(),
     "sweep_cand": dict(volume_mult=1.2, penetration_min_ticks=2, ltf_swing_lookback=2),
+    # Structural sweep test: turn off the OB-close invalidation exit.
+    "no_ob_invalid": dict(sweep_use_ob_invalidation=False),
+    # Continuation redesign: VWAP touch vs reclaim (gates off to isolate the trigger).
+    "cont_touch_nogate": {**_CONT_NOGATE, "cont_entry_mode": "touch"},
+    "cont_reclaim_nogate": {**_CONT_NOGATE, "cont_entry_mode": "reclaim"},
 }
 
 
@@ -115,4 +123,7 @@ def main(config_name: str) -> None:
 
 
 if __name__ == "__main__":
-    main(sys.argv[1] if len(sys.argv) > 1 else "DEFAULTS")
+    arg = sys.argv[1] if len(sys.argv) > 1 else "DEFAULTS"
+    names = list(CONFIGS) if arg == "ALL" else arg.split(",")
+    for name in names:
+        main(name)

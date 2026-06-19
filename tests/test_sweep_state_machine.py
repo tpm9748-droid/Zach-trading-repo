@@ -10,6 +10,7 @@ the smoke test in module 8.
 """
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date
 from typing import Optional
 
@@ -249,6 +250,37 @@ def test_short_stops_out():
 # ---------------------------------------------------------------------------
 # R:R filter
 # ---------------------------------------------------------------------------
+
+
+def test_ob_invalidation_exits_when_enabled():
+    """A bar closing back above the OB upper edge (without hitting the stop)
+    invalidates the trade when the rule is enabled (default)."""
+    sm = SweepStateMachine(DEFAULT_PARAMS)
+    swept = asia_high(100.0)
+    pair = asia_low(80.0)
+    bars_seq = _build_short_happy_bars()
+    # OB.upper = 100.75 (bar 7). Close 100.9 > 100.75, high 101.0 < stop 101.25.
+    bars_seq[13] = bar(13, 99, 101.0, 98.5, 100.9)
+    bars_seq[14] = bar(14, 100.9, 101.0, 100.5, 100.8)  # exit fill
+    ev = sweep_up_event(swept, penetration_bar_idx=7, wick_extreme=100.75, bars=bars_seq)
+    closed = feed(sm, bars_seq, {7: ev}, default_levels=[swept, pair])
+    assert len(closed) == 1
+    assert closed[0].exit_reason == "invalidated"
+
+
+def test_ob_invalidation_skipped_when_disabled():
+    """With the rule off, the same bar does NOT exit the trade early."""
+    params = replace(DEFAULT_PARAMS, sweep_use_ob_invalidation=False)
+    sm = SweepStateMachine(params)
+    swept = asia_high(100.0)
+    pair = asia_low(80.0)
+    bars_seq = _build_short_happy_bars()
+    bars_seq[13] = bar(13, 99, 101.0, 98.5, 100.9)
+    bars_seq[14] = bar(14, 100.9, 101.0, 100.5, 100.8)
+    ev = sweep_up_event(swept, penetration_bar_idx=7, wick_extreme=100.75, bars=bars_seq)
+    closed = feed(sm, bars_seq, {7: ev}, default_levels=[swept, pair])
+    assert closed == []  # no early invalidation -> trade still open
+    assert sm.state == SetupState.IN_TRADE
 
 
 def test_low_rr_rejects_trade():

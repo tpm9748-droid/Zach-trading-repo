@@ -166,12 +166,15 @@ class ContinuationStateMachine:
         if bar_idx <= setup.armed_bar_idx:
             return
 
-        # Retest = price pulls back and touches VWAP from the trend side.
+        # Retest = price pulls back to VWAP from the trend side. In "reclaim"
+        # mode it must also close back on the trend side (a VWAP rejection,
+        # not just a touch).
+        reclaim = self.params.cont_entry_mode == "reclaim"
         if setup.bias == "long":
-            touched = bar.low <= vwap
+            triggered = bar.low <= vwap and (not reclaim or bar.close > vwap)
         else:
-            touched = bar.high >= vwap
-        if not touched:
+            triggered = bar.high >= vwap and (not reclaim or bar.close < vwap)
+        if not triggered:
             return
 
         if not self._confluence_ok(setup.bias, vwap, pressure, absorption):

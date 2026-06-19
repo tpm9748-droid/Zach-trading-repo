@@ -248,6 +248,33 @@ def test_confluence_blocked_by_each_gate():
     assert cm._confluence_ok("long", 200.0, _buy_reading(), _absorb_reading()) is False
 
 
+def test_reclaim_mode_blocks_touch_without_close_back():
+    # In reclaim mode a bar that dips to VWAP but closes below it (long) is
+    # NOT an entry — it must close back on the trend side.
+    params = replace(GATES_OFF, cont_entry_mode="reclaim")
+    cm = make_cm(params=params, highs=[112.0])
+    bars = LONG_PREFIX[:7] + [
+        (101, 101, 99.5, 99.8),   # 7 dips to VWAP but closes below -> no reclaim
+        (99.8, 100, 99.5, 99.9),  # 8
+    ]
+    trades = feed(cm, bars)
+    assert trades == []
+    assert cm.state == ContState.WATCHING_FOR_RETEST
+
+
+def test_reclaim_mode_enters_on_close_back():
+    # Same retest that DOES close back above VWAP fires in reclaim mode.
+    params = replace(GATES_OFF, cont_entry_mode="reclaim")
+    cm = make_cm(params=params, highs=[112.0])
+    bars = LONG_PREFIX + [
+        (105, 112, 104, 111),       # target hit
+        (110, 110.5, 109.5, 110),   # exit fill
+    ]
+    trades = feed(cm, bars)
+    assert len(trades) == 1
+    assert trades[0].exit_reason == "target"
+
+
 def feed_continue(cm, bars, start):
     """Feed more bars continuing the index counter (for mid-stream changes)."""
     trades = []

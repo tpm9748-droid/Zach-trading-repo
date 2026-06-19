@@ -42,6 +42,10 @@ class StrategyParams:
     # Abandon a setup if no entry trigger fires within this many bars after
     # CHoCH (1m bars; default 30 = ~30 min).
     max_entry_bars: int = 30
+    # Exit an open sweep trade early if price closes back through the order
+    # block (the OB-invalidation rule). Toggleable so we can measure whether
+    # cutting trades early helps or hurts the R-multiple distribution.
+    sweep_use_ob_invalidation: bool = True
 
     # Pressure / absorption (module 11) — OHLCV approximations.
     # A "buying pressure" bar closes in its upper third, has a body that fills
@@ -65,6 +69,11 @@ class StrategyParams:
     # Mirror for shorts. Each confluence requirement is an independent gate
     # so it can be relaxed against real-data evidence without code changes.
     cont_htf_period: str = "4h"            # HTF trend filter timeframe
+    # Entry trigger on the VWAP retest:
+    #   "touch"   = bar dips to/through VWAP from the trend side (original).
+    #   "reclaim" = bar dips to/through VWAP AND closes back on the trend side
+    #               (a rejection of VWAP, not just a touch).
+    cont_entry_mode: str = "touch"
     cont_require_pressure: bool = True     # buying/selling pressure on retest bar
     cont_require_absorption: bool = True   # absorption at VWAP on retest bar
     cont_require_fvg_at_vwap: bool = True  # an active FVG straddling VWAP
