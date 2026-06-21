@@ -112,3 +112,15 @@ class StrategyParams:
 
 
 DEFAULT_PARAMS = StrategyParams()
+
+# The one configuration with a statistically defensible OOS edge (bootstrap
+# P(expectancy>0) ~= 96%, survives ~1pt/trade costs, best drawdown profile):
+# breakeven-1R exit + true order-flow delta confirmation, on top of the
+# default Asia-shorts exclusion. TICK-DATA ONLY — delta confirmation is a
+# no-op on OHLCV bars (delta=0 would reject every sweep), so do NOT use this
+# with the OHLCV loader. Still marginal (n~37); treat as a lead pending more
+# data. See scripts/robustness.py and memory `oos-validation-defaults-win`.
+RECOMMENDED_TICK_PARAMS = StrategyParams(
+    sweep_breakeven_at_r=1.0,
+    sweep_use_delta_confirmation=True,
+)

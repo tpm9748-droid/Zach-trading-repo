@@ -36,6 +36,8 @@ The strategy was rigorously validated OOS across 3 front-month contracts (NQZ5/N
 2. `sweep_breakeven_at_r=1.0` (opt-in; **strongest**) — pull stop to entry after +1R. Combined OOS +35→**+143**, win 26%→36%, same trade count, and improves the May holdout (+75→+152). No tick data needed. Strongest candidate to promote to default (needs intrabar-fill care first — a wide bar hitting +R then returning can book a same-bar BE stop; would change the long happy-path target test).
 3. `sweep_use_delta_confirmation=True` (opt-in, **tick-data only**) — aggressor delta opposing the sweep lifts win rate to ~37% (OOS +35→+255). No-op on OHLCV (delta=0). Caveat: ~halves trades; thin May (n=7, 0 wins). Best stacked config: be_1r + delta = OOS +287 / 47.8% win (but thin May −23).
 
+**Statistical significance (`scripts/robustness.py`, bootstrap + Monte-Carlo).** Sobering but important: of the configs, ONLY `be_1r + delta_confirm` is statistically distinguishable from zero (P(expectancy>0) ≈ 96–97%, survives ~1pt/trade costs, ~4× lower drawdown than DEFAULTS). DEFAULTS (76%), be_1r (88%), delta alone (94%) all have CIs crossing 0 — leads, not proof. This config is codified as `RECOMMENDED_TICK_PARAMS` in params.py (tick-data only; n≈37, still marginal). Sample size is the wall — the reason more data is the gating need.
+
 **Directional edge is beta, not tradeable** (alpha-vs-beta check): profit skewed long only because the sample was net up-trending; no trend filter captured it OOS. The validated levers all move WIN RATE (direction-neutral), so they are not beta artifacts.
 
 **Continuation has no edge** in any tested variant and is shelved (inert by default: gates on ⇒ 0 trades).
